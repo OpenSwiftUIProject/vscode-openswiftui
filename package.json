@@ -2,7 +2,7 @@
   "name": "openswiftui-preview",
   "displayName": "OpenSwiftUI Preview",
   "description": "Run interactive OpenSwiftUI previews in native macOS and iOS Simulator windows.",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "publisher": "OpenSwiftUIProject",
   "license": "Apache-2.0",
   "repository": {
