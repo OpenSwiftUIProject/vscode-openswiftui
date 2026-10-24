@@ -5,6 +5,22 @@
   "version": "0.1.0",
   "publisher": "OpenSwiftUIProject",
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/OpenSwiftUIProject/vscode-openswiftui.git"
+  },
+  "homepage": "https://github.com/OpenSwiftUIProject/vscode-openswiftui#readme",
+  "bugs": {
+    "url": "https://github.com/OpenSwiftUIProject/vscode-openswiftui/issues"
+  },
+  "keywords": [
+    "openswiftui",
+    "swift",
+    "preview",
+    "ios",
+    "macos"
+  ],
+  "icon": "media/icon.png",
   "engines": {
     "vscode": "^1.88.0"
   },
@@ -118,7 +134,7 @@
     "test": "npm run compile && node --test dist/test/*.test.js",
     "test:extension": "npm run compile && node dist/test/runExtensionTests.js",
     "vscode:prepublish": "npm run compile",
-    "package": "vsce package --no-dependencies --allow-missing-repository --no-rewrite-relative-links",
+    "package": "vsce package --no-dependencies",
     "test:automatic": "npm run compile && node dist/test/automaticIntegration.js"
   },
   "devDependencies": {

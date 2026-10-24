@@ -202,3 +202,65 @@ templates are runtime inputs, not development-only files.
 - Keep current compatibility limits in README and the sample/host guides. Separate
   historical results from new checks; do not reuse an earlier runtime's gesture
   result as acceptance of a new release.
+
+## Marketplace releases
+
+The [publish workflow](.github/workflows/publish.yml) packages one universal VSIX.
+It runs on a published stable GitHub Release. The tag must match `package.json`
+exactly, without a `v` prefix. The workflow runs `npm test` on Linux, then builds
+the VSIX once. The publish job verifies its checksum and uploads that artifact.
+Linux skips the macOS compiler probes; this workflow does not verify native
+rendering or input. Complete relevant native checks before a release.
+
+Authentication uses GitHub OIDC, `Azure/login`, and `vsce --azure-credential`.
+It requires a Microsoft Entra tenant and a dedicated application/service principal
+with Marketplace access. A personal Microsoft account login alone does not set up
+this identity. No PAT or client secret is needed.
+
+### One-time setup
+
+1. Create the GitHub environment `marketplace`. Limit deployment refs to release
+   tags and the maintained branch used for manual runs. Protect those refs from
+   unauthorized changes.
+2. Create an Entra application/service principal and add a federated credential:
+
+   | Field | Value |
+   | --- | --- |
+   | Issuer | `https://token.actions.githubusercontent.com` |
+   | Audience | `api://AzureADTokenExchange` |
+   | Subject | `repo:OpenSwiftUIProject@154427668/vscode-openswiftui@1431765306:environment:marketplace` |
+
+   This repository uses GitHub's immutable subject format. Confirm the current
+   configuration if the repository is renamed, transferred, or recreated:
+
+   ```sh
+   gh api repos/OpenSwiftUIProject/vscode-openswiftui/actions/oidc/customization/sub
+   ```
+
+3. Add `AZURE_CLIENT_ID` and `AZURE_TENANT_ID` as environment secrets. Use the
+   application's client ID and the tenant ID. `Azure/login` permits login without
+   an Azure subscription for this workflow.
+4. Run the workflow manually with the `identity` operation and an existing release
+   tag. This builds the package, logs in as the publishing identity, and prints its
+   Marketplace profile ID without uploading the extension.
+5. Add that profile ID to the `OpenSwiftUIProject` Marketplace publisher with the
+   **Contributor** role. Use the returned profile ID, not the Entra client or object
+   ID. Azure role assignments alone do not grant Marketplace access.
+
+See [Marketplace publishing](https://code.visualstudio.com/api/working-with-extensions/publishing-extension#secure-automated-publishing-to-visual-studio-marketplace),
+[Azure login](https://github.com/Azure/login#login-with-openid-connect-oidc-recommended),
+and [GitHub OIDC subjects](https://docs.github.com/en/actions/reference/security/oidc#immutable-subject-claims).
+
+### Release procedure
+
+Update the manifest and lockfile version, commit the release, and push a matching
+tag. Publish its GitHub Release after required checks pass. The tagged commit must
+contain the workflow and the complete Marketplace metadata. Publishing an older
+tag does not include later source changes.
+
+For a package-only run, use **Actions > Publish extension > Run workflow** with an
+existing tag and the default `package` operation. Download `marketplace-vsix`
+from that run to inspect the package. The `publish` operation can publish
+an existing tag after identity setup. It does not rebuild an existing GitHub Release
+asset or replace it. Marketplace versions are immutable; use a new version for an
+update and do not treat a duplicate-version error as a successful upload.

@@ -1,0 +1,135 @@
+name: Publish extension
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag that matches package.json (for example, 0.1.1)
+        required: true
+        type: string
+      operation:
+        description: Package only, show the publishing identity, or publish
+        default: package
+        required: true
+        type: choice
+        options: [package, identity, publish]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: marketplace-publish
+  cancel-in-progress: false
+
+jobs:
+  package:
+    if: github.event_name == 'workflow_dispatch' || !github.event.release.prerelease
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      file: ${{ steps.manifest.outputs.file }}
+      commit: ${{ steps.package.outputs.commit }}
+      sha256: ${{ steps.package.outputs.sha256 }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: refs/tags/${{ github.event.release.tag_name || inputs.tag }}
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+      - name: Check release identity
+        id: manifest
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const manifest = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          const tag = process.env.RELEASE_TAG;
+          if (!/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(tag) || tag !== manifest.version) {
+            throw new Error('Use a stable release tag that matches package.json exactly.');
+          }
+          if (manifest.publisher !== 'OpenSwiftUIProject' || manifest.name !== 'openswiftui-preview') {
+            throw new Error('The extension identity does not match the Marketplace publisher.');
+          }
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `file=${manifest.name}-${tag}.vsix\n`);
+          NODE
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+      - name: Test extension
+        run: npm test
+      - name: Package universal VSIX
+        id: package
+        env:
+          VSIX_FILE: ${{ steps.manifest.outputs.file }}
+        run: |
+          npm run package -- --out "$RUNNER_TEMP/$VSIX_FILE"
+          echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "sha256=$(sha256sum "$RUNNER_TEMP/$VSIX_FILE" | cut -d ' ' -f 1)" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: marketplace-vsix
+          path: ${{ runner.temp }}/${{ steps.manifest.outputs.file }}
+          if-no-files-found: error
+          retention-days: 14
+
+  publish:
+    needs: package
+    if: github.event_name == 'release' || inputs.operation == 'identity' || inputs.operation == 'publish'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: marketplace
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      AZURE_CORE_OUTPUT: none
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+    steps:
+      - name: Check publishing configuration
+        env:
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+        run: |
+          if [ -z "$AZURE_CLIENT_ID" ] || [ -z "$AZURE_TENANT_ID" ]; then
+            echo '::error::Set AZURE_CLIENT_ID and AZURE_TENANT_ID in the marketplace environment.'
+            exit 1
+          fi
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.package.outputs.commit }}
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+      - name: Install publishing tool
+        run: npm ci --ignore-scripts
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: marketplace-vsix
+          path: ${{ runner.temp }}/marketplace-vsix
+      - name: Verify package checksum
+        working-directory: ${{ runner.temp }}/marketplace-vsix
+        env:
+          VSIX_FILE: ${{ needs.package.outputs.file }}
+          VSIX_SHA256: ${{ needs.package.outputs.sha256 }}
+        run: printf '%s  %s\n' "$VSIX_SHA256" "$VSIX_FILE" | sha256sum --check --strict
+      - uses: Azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          allow-no-subscriptions: true
+      - name: Show Marketplace profile ID for publisher setup
+        if: github.event_name == 'workflow_dispatch' && inputs.operation == 'identity'
+        run: |
+          az rest \
+            --url 'https://app.vssps.visualstudio.com/_apis/profile/profiles/me?api-version=7.1' \
+            --resource 499b84ac-1321-427f-aa17-267ca6975798 \
+            --query id --output tsv
+      - name: Publish to Marketplace
+        if: github.event_name == 'release' || inputs.operation == 'publish'
+        env:
+          VSIX_FILE: ${{ needs.package.outputs.file }}
+        run: ./node_modules/.bin/vsce publish --azure-credential --packagePath "$RUNNER_TEMP/marketplace-vsix/$VSIX_FILE"

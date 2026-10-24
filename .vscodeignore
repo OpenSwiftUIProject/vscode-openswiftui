@@ -1,10 +1,12 @@
 .git/**
+.github/**
 .vscode/**
 src/**
 test/**
 dist/test/**
 **/*.map
 node_modules/**
+media/*.origin.*
 tsconfig.json
 package-lock.json
 .test-output/**
