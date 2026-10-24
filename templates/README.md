@@ -101,6 +101,9 @@ Readiness confirms the host lifecycle, not gesture support in the linked runtime
 
 Keep the host process alive for interaction. AppKit and UIKit deliver input to
 OpenSwiftUI and schedule redraws in the external macOS or Simulator window.
+The macOS window starts at the content's ideal size. Its minimum and maximum sizes
+follow the content's layout constraints, including explicit `.frame` modifiers.
+Flexible content permits manual window resizing.
 Closing the last macOS preview window exits the host. The extension stops the
 iOS app when the user stops the session.
 

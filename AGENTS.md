@@ -173,6 +173,17 @@ Simulator. A ready token,
 successful import, typecheck, or compiler fixture is not gesture proof. Record
 the exact runtime, toolchain, platform, and observed behavior with results.
 
+For macOS window sizing, resolve the DemoKit dependencies, then run:
+
+```sh
+python3 test/nativeHostSizing.py examples/DemoKit/.build/artifacts/openswiftui-spm
+```
+
+This check compiles the actual host template against the existing binary artifacts
+and opens its own windows. It checks ideal content size, explicit frames, content
+size changes, empty content, and manual resizing of flexible content. It requires
+access to the macOS window server and does not test gestures or build OpenSwiftUI.
+
 ## Packaging and maintenance
 
 ```sh

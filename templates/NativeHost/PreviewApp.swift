@@ -23,16 +23,16 @@ private final class PreviewAppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let controller = OpenSwiftUI.NSHostingController(rootView: PreviewSession.makeContent())
-        controller.sizingOptions = []
+        controller.sizingOptions = [.standardBounds, .preferredContentSize]
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 480, height: 640),
+            contentRect: .zero,
             styleMask: [.titled, .closable, .miniaturizable, .resizable],
             backing: .buffered,
             defer: false
         )
         window.title = "OpenSwiftUI Preview"
         window.contentViewController = controller
-        window.setContentSize(NSSize(width: 480, height: 640))
+        window.setContentSize(controller.preferredContentSize)
         window.isReleasedWhenClosed = false
         self.window = window
         window.center()
