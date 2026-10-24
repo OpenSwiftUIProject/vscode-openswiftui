@@ -1,0 +1,131 @@
+{
+  "name": "openswiftui-preview",
+  "displayName": "OpenSwiftUI Preview",
+  "description": "Run interactive OpenSwiftUI previews in native macOS and iOS Simulator windows.",
+  "version": "0.1.0",
+  "publisher": "OpenSwiftUIProject",
+  "license": "Apache-2.0",
+  "engines": {
+    "vscode": "^1.88.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "main": "./dist/src/extension.js",
+  "extensionKind": [
+    "workspace"
+  ],
+  "extensionDependencies": [
+    "swiftlang.swift-vscode"
+  ],
+  "activationEvents": [
+    "workspaceContains:.vscode/openswiftui-previews.json",
+    "onLanguage:swift"
+  ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": false,
+      "description": "Preview runs build commands and native application code from this workspace."
+    },
+    "virtualWorkspaces": {
+      "supported": false,
+      "description": "Preview requires a local Xcode project and native application host."
+    }
+  },
+  "contributes": {
+    "commands": [
+      {
+        "command": "openswiftui.preview.run",
+        "title": "Run Preview",
+        "category": "OpenSwiftUI",
+        "enablement": "isWorkspaceTrusted"
+      },
+      {
+        "command": "openswiftui.preview.rebuild",
+        "title": "Rebuild Preview",
+        "category": "OpenSwiftUI",
+        "enablement": "isWorkspaceTrusted"
+      },
+      {
+        "command": "openswiftui.preview.stop",
+        "title": "Stop Preview",
+        "category": "OpenSwiftUI"
+      },
+      {
+        "command": "openswiftui.preview.configure",
+        "title": "Configure Previews",
+        "category": "OpenSwiftUI"
+      },
+      {
+        "command": "openswiftui.preview.logs",
+        "title": "Show Preview Log",
+        "category": "OpenSwiftUI"
+      }
+    ],
+    "views": {
+      "openswiftui-preview": [
+        {
+          "id": "openswiftui.previews",
+          "name": "Current File",
+          "when": "isWorkspaceTrusted"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "openswiftui.previews",
+        "contents": "Open a Swift file with #Preview or PreviewProvider declarations to see its previews.\n[Run Preview](command:openswiftui.preview.run)"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "openswiftui.preview.run",
+          "when": "view == openswiftui.previews",
+          "group": "navigation@1"
+        },
+        {
+          "command": "openswiftui.preview.stop",
+          "when": "view == openswiftui.previews",
+          "group": "navigation@2"
+        },
+        {
+          "command": "openswiftui.preview.logs",
+          "when": "view == openswiftui.previews",
+          "group": "navigation@3"
+        }
+      ]
+    },
+    "jsonValidation": [
+      {
+        "fileMatch": "**/.vscode/openswiftui-previews.json",
+        "url": "./schemas/previews.schema.json"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "openswiftui-preview",
+          "title": "Preview",
+          "icon": "media/preview.svg"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p .",
+    "watch": "tsc -w -p .",
+    "test": "npm run compile && node --test dist/test/*.test.js",
+    "test:extension": "npm run compile && node dist/test/runExtensionTests.js",
+    "vscode:prepublish": "npm run compile",
+    "package": "vsce package --no-dependencies --allow-missing-repository --no-rewrite-relative-links",
+    "test:automatic": "npm run compile && node dist/test/automaticIntegration.js"
+  },
+  "devDependencies": {
+    "@types/node": "22.18.0",
+    "@types/vscode": "1.88.0",
+    "@vscode/test-electron": "2.5.2",
+    "@vscode/vsce": "3.6.0",
+    "typescript": "5.9.3"
+  }
+}

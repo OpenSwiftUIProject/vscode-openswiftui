@@ -1,0 +1,118 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {};
+	objectVersion = 56;
+	objects = {
+		000000000000000000000009 = { isa = PBXBuildFile; fileRef = 000000000000000000000008; };
+		00000000000000000000000B = { isa = PBXBuildFile; fileRef = 00000000000000000000000A; };
+		00000000000000000000000E = { isa = PBXBuildFile; productRef = 00000000000000000000000D; };
+		000000000000000000000005 = { isa = PBXFileReference; explicitFileType = wrapper.application; path = DemoApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		000000000000000000000008 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/ContentView.swift; sourceTree = SOURCE_ROOT; };
+		00000000000000000000000A = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/DemoApp.swift; sourceTree = SOURCE_ROOT; };
+		000000000000000000000006 = { isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (000000000000000000000009, 00000000000000000000000B); runOnlyForDeploymentPostprocessing = 0; };
+		000000000000000000000007 = { isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (00000000000000000000000E); runOnlyForDeploymentPostprocessing = 0; };
+		000000000000000000000003 = { isa = PBXGroup; children = (000000000000000000000008, 00000000000000000000000A, 000000000000000000000004); sourceTree = "<group>"; };
+		000000000000000000000004 = { isa = PBXGroup; children = (000000000000000000000005); name = Products; sourceTree = "<group>"; };
+		000000000000000000000002 = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 000000000000000000000014;
+			buildPhases = (000000000000000000000006, 000000000000000000000007);
+			buildRules = ();
+			dependencies = ();
+			name = DemoApp;
+			packageProductDependencies = (00000000000000000000000D);
+			productName = DemoApp;
+			productReference = 000000000000000000000005;
+			productType = "com.apple.product-type.application";
+		};
+		000000000000000000000001 = {
+			isa = PBXProject;
+			attributes = { LastUpgradeCheck = 2660; };
+			buildConfigurationList = 000000000000000000000011;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (en, Base);
+			mainGroup = 000000000000000000000003;
+			packageReferences = (00000000000000000000000C);
+			productRefGroup = 000000000000000000000004;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (000000000000000000000002);
+		};
+		00000000000000000000000F = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_MODULES = YES;
+				SDKROOT = auto;
+				SWIFT_VERSION = 6.0;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				SUPPORTED_PLATFORMS = "macosx iphonesimulator iphoneos";
+			};
+			name = Debug;
+		};
+		000000000000000000000010 = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_MODULES = YES;
+				SDKROOT = auto;
+				SWIFT_VERSION = 6.0;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				SUPPORTED_PLATFORMS = "macosx iphonesimulator iphoneos";
+			};
+			name = Release;
+		};
+		000000000000000000000012 = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				PRODUCT_BUNDLE_IDENTIFIER = org.openswiftuiproject.openswiftui.demoapp;
+				PRODUCT_NAME = DemoApp;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = DemoApp;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "$(inherited) @executable_path/../Frameworks";
+				"LD_RUNPATH_SEARCH_PATHS[sdk=iphone*]" = "$(inherited) @executable_path/Frameworks";
+				CODE_SIGN_STYLE = Automatic;
+				CODE_SIGN_IDENTITY = "-";
+				ENABLE_APP_SANDBOX = NO;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+			};
+			name = Debug;
+		};
+		000000000000000000000013 = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				PRODUCT_BUNDLE_IDENTIFIER = org.openswiftuiproject.openswiftui.demoapp;
+				PRODUCT_NAME = DemoApp;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = DemoApp;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "$(inherited) @executable_path/../Frameworks";
+				"LD_RUNPATH_SEARCH_PATHS[sdk=iphone*]" = "$(inherited) @executable_path/Frameworks";
+				CODE_SIGN_STYLE = Automatic;
+				CODE_SIGN_IDENTITY = "-";
+				ENABLE_APP_SANDBOX = NO;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+			};
+			name = Release;
+		};
+		000000000000000000000011 = { isa = XCConfigurationList; buildConfigurations = (00000000000000000000000F, 000000000000000000000010); defaultConfigurationIsVisible = 0; defaultConfigurationName = Debug; };
+		000000000000000000000014 = { isa = XCConfigurationList; buildConfigurations = (000000000000000000000012, 000000000000000000000013); defaultConfigurationIsVisible = 0; defaultConfigurationName = Debug; };
+		00000000000000000000000C = { isa = XCRemoteSwiftPackageReference; repositoryURL = "https://github.com/OpenSwiftUIProject/OpenSwiftUI-spm"; requirement = { kind = exactVersion; version = 0.24.3; }; };
+		00000000000000000000000D = { isa = XCSwiftPackageProductDependency; package = 00000000000000000000000C; productName = OpenSwiftUI; };
+	};
+	rootObject = 000000000000000000000001;
+}
