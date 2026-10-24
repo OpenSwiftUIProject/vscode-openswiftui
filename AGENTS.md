@@ -277,6 +277,9 @@ this identity. No PAT or client secret is needed.
 5. Add that profile ID to the `OpenSwiftUIProject` Marketplace publisher with the
    **Contributor** role. Use the returned profile ID, not the Entra client or object
    ID. Azure role assignments alone do not grant Marketplace access.
+6. Run the `verify` operation. It checks the identity's assigned publisher role
+   and VSCE authentication without uploading a version. The role check rejects
+   Reader access, which `vsce verify-pat` alone can accept.
 
 See [Marketplace publishing](https://code.visualstudio.com/api/working-with-extensions/publishing-extension#secure-automated-publishing-to-visual-studio-marketplace),
 [Azure login](https://github.com/Azure/login#login-with-openid-connect-oidc-recommended),
@@ -297,6 +300,7 @@ with an existing tag and one of these operations:
 | --- | --- |
 | `package` (default) | Test and package only. |
 | `identity` | Package and show the Marketplace profile ID without publishing. |
+| `verify` | Package and verify OIDC authentication and publisher access without publishing. |
 | `github-release` | Package and publish GitHub Release only. |
 | `marketplace` | Package and publish Marketplace only. |
 | `publish` | Package once and publish both destinations. |

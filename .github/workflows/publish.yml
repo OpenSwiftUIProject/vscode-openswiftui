@@ -12,11 +12,11 @@ on:
         required: true
         type: string
       operation:
-        description: Package, inspect identity, or publish to one or both destinations
+        description: Package, inspect identity, verify access, or publish
         default: package
         required: true
         type: choice
-        options: [package, identity, github-release, marketplace, publish]
+        options: [package, identity, verify, github-release, marketplace, publish]
 
 permissions:
   contents: read
@@ -131,7 +131,7 @@ jobs:
   marketplace:
     name: Publish to Marketplace
     needs: package
-    if: github.event_name == 'push' || inputs.operation == 'identity' || inputs.operation == 'marketplace' || inputs.operation == 'publish'
+    if: github.event_name == 'push' || inputs.operation == 'identity' || inputs.operation == 'verify' || inputs.operation == 'marketplace' || inputs.operation == 'publish'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment: marketplace
@@ -176,12 +176,37 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           allow-no-subscriptions: true
       - name: Show Marketplace profile ID for publisher setup
-        if: github.event_name == 'workflow_dispatch' && inputs.operation == 'identity'
+        id: identity
+        if: github.event_name == 'workflow_dispatch' && (inputs.operation == 'identity' || inputs.operation == 'verify')
         run: |
-          az rest \
+          profile_id=$(az rest \
             --url 'https://app.vssps.visualstudio.com/_apis/profile/profiles/me?api-version=7.1' \
             --resource 499b84ac-1321-427f-aa17-267ca6975798 \
-            --query id --output tsv
+            --query id --output tsv)
+          if [[ ! "$profile_id" =~ ^[0-9a-fA-F]{8}-([0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}$ ]]; then
+            echo '::error::Marketplace did not return a valid profile ID.'
+            exit 1
+          fi
+          printf 'Marketplace profile ID: %s\n' "$profile_id"
+          printf 'profile=%s\n' "$profile_id" >> "$GITHUB_OUTPUT"
+      - name: Verify Marketplace publisher role without uploading
+        if: github.event_name == 'workflow_dispatch' && inputs.operation == 'verify'
+        env:
+          MARKETPLACE_PROFILE_ID: ${{ steps.identity.outputs.profile }}
+        run: |
+          role=$(az rest \
+            --url 'https://marketplace.visualstudio.com/_apis/securityroles/scopes/gallery.publisher/roleassignments/resources/OpenSwiftUIProject?api-version=7.1-preview.1' \
+            --resource 499b84ac-1321-427f-aa17-267ca6975798 \
+            --query "value[?identity.id=='$MARKETPLACE_PROFILE_ID'].role.name | [0]" --output tsv)
+          case "${role,,}" in
+            contributor|owner|creator) ;;
+            *)
+              echo '::error::The publishing identity needs Contributor access to OpenSwiftUIProject.'
+              exit 1
+              ;;
+          esac
+          ./node_modules/.bin/vsce verify-pat OpenSwiftUIProject --azure-credential
+          printf 'Verified OpenSwiftUIProject publisher role: %s. No version was uploaded.\n' "$role" >> "$GITHUB_STEP_SUMMARY"
       - name: Publish to Marketplace
         if: github.event_name == 'push' || inputs.operation == 'marketplace' || inputs.operation == 'publish'
         env:
