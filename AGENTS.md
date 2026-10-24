@@ -217,11 +217,31 @@ templates are runtime inputs, not development-only files.
 ## Marketplace releases
 
 The [publish workflow](.github/workflows/publish.yml) packages one universal VSIX.
-It runs on a published stable GitHub Release. The tag must match `package.json`
-exactly, without a `v` prefix. The workflow runs `npm test` on Linux, then builds
-the VSIX once. The publish job verifies its checksum and uploads that artifact.
-Linux skips the macOS compiler probes; this workflow does not verify native
+Pushing a stable version tag starts the workflow. The tag must match `package.json`
+and `package-lock.json` exactly, without a `v` prefix. The workflow runs `npm test`
+on Linux, then builds the VSIX once and records its commit and SHA256. Two
+independent jobs consume that artifact:
+
+- GitHub Release creates a draft with generated notes, uploads the VSIX and
+  `SHA256SUMS`, verifies their digests and the tag's commit, then publishes it.
+- Marketplace verifies the package checksum and publishes the same VSIX through
+  the `marketplace` environment.
+
+A Marketplace configuration or upload failure does not block GitHub Release.
+There is no `release.published` trigger: both jobs belong to the tag workflow, so
+they do not rely on a release event created by `GITHUB_TOKEN` starting another run.
+Linux skips the macOS compiler probes; the workflow does not verify native
 rendering or input. Complete relevant native checks before a release.
+
+The GitHub Release job uses the repository's `GITHUB_TOKEN` with `contents: write`.
+It does not need a separate token or the Marketplace identity. Its scripts come
+from the workflow commit; the package always comes from the requested tag. This
+also supports manual runs for older tags. Validate release changes with:
+
+```sh
+node --test .github/scripts/github-release.test.cjs
+actionlint .github/workflows/publish.yml
+```
 
 Authentication uses GitHub OIDC, `Azure/login`, and `vsce --azure-credential`.
 It requires a Microsoft Entra tenant and a dedicated application/service principal
@@ -265,13 +285,31 @@ and [GitHub OIDC subjects](https://docs.github.com/en/actions/reference/security
 ### Release procedure
 
 Update the manifest and lockfile version, commit the release, and push a matching
-tag. Publish its GitHub Release after required checks pass. The tagged commit must
-contain the workflow and the complete Marketplace metadata. Publishing an older
-tag does not include later source changes.
+tag. The tag workflow tests, packages, and publishes to both destinations. Do not
+create a GitHub Release first. The tagged commit must contain this workflow and
+the complete Marketplace metadata. Existing tags do not gain a push event when
+the workflow changes; use a manual run when needed.
 
-For a package-only run, use **Actions > Publish extension > Run workflow** with an
-existing tag and the default `package` operation. Download `marketplace-vsix`
-from that run to inspect the package. The `publish` operation can publish
-an existing tag after identity setup. It does not rebuild an existing GitHub Release
-asset or replace it. Marketplace versions are immutable; use a new version for an
-update and do not treat a duplicate-version error as a successful upload.
+Use **Actions > Release extension > Run workflow** from the maintained branch
+with an existing tag and one of these operations:
+
+| Operation | Result |
+| --- | --- |
+| `package` (default) | Test and package only. |
+| `identity` | Package and show the Marketplace profile ID without publishing. |
+| `github-release` | Package and publish GitHub Release only. |
+| `marketplace` | Package and publish Marketplace only. |
+| `publish` | Package once and publish both destinations. |
+
+Download `marketplace-vsix` from the run to inspect the VSIX and `SHA256SUMS`.
+For a partial failure, prefer **Re-run failed jobs** so the retry uses the original
+package. A complete rerun or a manual run builds a new package, whose ZIP checksum
+can differ even for the same source commit.
+
+GitHub publication can resume a draft with matching assets and accepts an already
+published release only if both asset digests match. It never overwrites an asset
+or edits an incomplete published release. Resolve a conflict explicitly instead
+of replacing a released file. Marketplace versions are immutable; use a new
+version for an update and do not treat a duplicate-version error as a successful
+upload. If Marketplace has already accepted a version, retry only the GitHub job
+with the original artifact or create its release manually from that exact VSIX.

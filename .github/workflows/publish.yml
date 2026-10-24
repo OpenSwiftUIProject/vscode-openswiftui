@@ -1,8 +1,10 @@
-name: Publish extension
+name: Release extension
+run-name: Release ${{ inputs.tag || github.ref_name }} (${{ inputs.operation || 'publish' }})
 
 on:
-  release:
-    types: [published]
+  push:
+    tags:
+      - '[0-9]+.[0-9]+.[0-9]+'
   workflow_dispatch:
     inputs:
       tag:
@@ -10,32 +12,34 @@ on:
         required: true
         type: string
       operation:
-        description: Package only, show the publishing identity, or publish
+        description: Package, inspect identity, or publish to one or both destinations
         default: package
         required: true
         type: choice
-        options: [package, identity, publish]
+        options: [package, identity, github-release, marketplace, publish]
 
 permissions:
   contents: read
 
 concurrency:
-  group: marketplace-publish
+  group: extension-release-${{ inputs.tag || github.ref_name }}
   cancel-in-progress: false
 
 jobs:
   package:
-    if: github.event_name == 'workflow_dispatch' || !github.event.release.prerelease
+    if: github.event_name != 'push' || !github.event.deleted
     runs-on: ubuntu-latest
     timeout-minutes: 15
     outputs:
+      tag: ${{ steps.manifest.outputs.tag }}
       file: ${{ steps.manifest.outputs.file }}
       commit: ${{ steps.package.outputs.commit }}
       sha256: ${{ steps.package.outputs.sha256 }}
+      artifact: ${{ steps.artifact.outputs.artifact-id }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: refs/tags/${{ github.event.release.tag_name || inputs.tag }}
+          ref: refs/tags/${{ inputs.tag || github.ref_name }}
           persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -43,11 +47,14 @@ jobs:
       - name: Check release identity
         id: manifest
         env:
-          RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+          PUSH_COMMIT: ${{ github.event_name == 'push' && github.sha || '' }}
         run: |
           node <<'NODE'
           const fs = require('node:fs');
+          const { execFileSync } = require('node:child_process');
           const manifest = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          const lock = JSON.parse(fs.readFileSync('package-lock.json', 'utf8'));
           const tag = process.env.RELEASE_TAG;
           if (!/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(tag) || tag !== manifest.version) {
             throw new Error('Use a stable release tag that matches package.json exactly.');
@@ -55,6 +62,13 @@ jobs:
           if (manifest.publisher !== 'OpenSwiftUIProject' || manifest.name !== 'openswiftui-preview') {
             throw new Error('The extension identity does not match the Marketplace publisher.');
           }
+          if (lock.version !== tag || lock.packages[''].version !== tag) {
+            throw new Error('The lockfile version must match the release tag.');
+          }
+          if (process.env.PUSH_COMMIT && execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim() !== process.env.PUSH_COMMIT) {
+            throw new Error('The release tag no longer matches the pushed commit.');
+          }
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `tag=${tag}\n`);
           fs.appendFileSync(process.env.GITHUB_OUTPUT, `file=${manifest.name}-${tag}.vsix\n`);
           NODE
       - name: Install dependencies
@@ -66,19 +80,58 @@ jobs:
         env:
           VSIX_FILE: ${{ steps.manifest.outputs.file }}
         run: |
-          npm run package -- --out "$RUNNER_TEMP/$VSIX_FILE"
+          mkdir -p "$RUNNER_TEMP/release-artifacts"
+          npm run package -- --out "$RUNNER_TEMP/release-artifacts/$VSIX_FILE"
           echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-          echo "sha256=$(sha256sum "$RUNNER_TEMP/$VSIX_FILE" | cut -d ' ' -f 1)" >> "$GITHUB_OUTPUT"
+          cd "$RUNNER_TEMP/release-artifacts"
+          sha256sum "$VSIX_FILE" > SHA256SUMS
+          echo "sha256=$(cut -d ' ' -f 1 SHA256SUMS)" >> "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        id: artifact
         with:
           name: marketplace-vsix
-          path: ${{ runner.temp }}/${{ steps.manifest.outputs.file }}
+          path: ${{ runner.temp }}/release-artifacts/*
           if-no-files-found: error
           retention-days: 14
 
-  publish:
+  github-release:
+    name: Publish GitHub Release
     needs: package
-    if: github.event_name == 'release' || inputs.operation == 'identity' || inputs.operation == 'publish'
+    if: github.event_name == 'push' || inputs.operation == 'github-release' || inputs.operation == 'publish'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      # Use this workflow's scripts even when manually releasing an older tag.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+      - name: Test release publication
+        run: node --test .github/scripts/github-release.test.cjs
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          artifact-ids: ${{ needs.package.outputs.artifact }}
+          path: ${{ runner.temp }}/release-artifacts
+          merge-multiple: true
+      - name: Create or resume the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.package.outputs.tag }}
+          RELEASE_COMMIT: ${{ needs.package.outputs.commit }}
+          RELEASE_DIRECTORY: ${{ runner.temp }}/release-artifacts
+          VSIX_FILE: ${{ needs.package.outputs.file }}
+          VSIX_SHA256: ${{ needs.package.outputs.sha256 }}
+        run: node .github/scripts/github-release.cjs
+
+  marketplace:
+    name: Publish to Marketplace
+    needs: package
+    if: github.event_name == 'push' || inputs.operation == 'identity' || inputs.operation == 'marketplace' || inputs.operation == 'publish'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment: marketplace
@@ -108,8 +161,9 @@ jobs:
         run: npm ci --ignore-scripts
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: marketplace-vsix
+          artifact-ids: ${{ needs.package.outputs.artifact }}
           path: ${{ runner.temp }}/marketplace-vsix
+          merge-multiple: true
       - name: Verify package checksum
         working-directory: ${{ runner.temp }}/marketplace-vsix
         env:
@@ -129,7 +183,7 @@ jobs:
             --resource 499b84ac-1321-427f-aa17-267ca6975798 \
             --query id --output tsv
       - name: Publish to Marketplace
-        if: github.event_name == 'release' || inputs.operation == 'publish'
+        if: github.event_name == 'push' || inputs.operation == 'marketplace' || inputs.operation == 'publish'
         env:
           VSIX_FILE: ${{ needs.package.outputs.file }}
         run: ./node_modules/.bin/vsce publish --azure-credential --packagePath "$RUNNER_TEMP/marketplace-vsix/$VSIX_FILE"
