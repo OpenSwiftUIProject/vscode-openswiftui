@@ -39,9 +39,13 @@ function publishRelease({ repo, tag, commit, directory, file, sha256 }, gh = run
         try {
             return api(`releases/tags/${tag}`);
         } catch (error) {
-            if (/\(HTTP 404\)/.test(String(error.stderr))) return undefined;
-            throw error;
+            if (!/\(HTTP 404\)/.test(String(error.stderr))) throw error;
         }
+        // The tag endpoint excludes drafts. List releases before creating another.
+        const pages = JSON.parse(gh(['api', `repos/${repo}/releases?per_page=100`, '--paginate', '--slurp']));
+        const matches = pages.flat().filter(release => release.tag_name === tag);
+        if (matches.length > 1) throw new Error('Multiple releases use the requested tag.');
+        return matches[0];
     }
 
     function missingAssets(release) {

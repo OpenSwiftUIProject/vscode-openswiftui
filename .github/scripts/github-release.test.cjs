@@ -32,8 +32,16 @@ function fixture(t, options = {}) {
                 return JSON.stringify({ object: { type: 'commit', sha: options.movedTag && tagReads > 1 ? 'c'.repeat(40) : config.commit } });
             }
             if (args[1].includes('/releases/tags/')) {
-                if (release) return JSON.stringify(release);
+                if (release && !release.draft) return JSON.stringify(release);
                 throw Object.assign(new Error('Request failed'), { stderr: Buffer.from(`gh: Not Found (HTTP ${options.status || 404})`) });
+            }
+            if (args[1].endsWith('/releases?per_page=100')) {
+                if (options.listStatus) {
+                    throw Object.assign(new Error('Release listing failed'), { stderr: Buffer.from(`gh: Forbidden (HTTP ${options.listStatus})`) });
+                }
+                const pages = [...(options.releasePages || []), release ? [release] : []];
+                if (!args.includes('--paginate')) return JSON.stringify(pages[0]);
+                return args.includes('--slurp') ? JSON.stringify(pages) : pages.map(page => JSON.stringify(page)).join('\n');
             }
         }
         writes.push(args);
@@ -87,6 +95,23 @@ test('resumes a partial draft without replacing an existing asset', t => {
     assert.deepEqual(f.writes.map(args => args[1]), ['upload', 'edit']);
     assert.equal(f.writes[0][3], path.join(f.config.directory, 'SHA256SUMS'));
     assert.ok(!f.writes[0].includes('--clobber'));
+});
+
+test('finds an existing draft after the first release page', t => {
+    const release = { tag_name: '0.1.2', draft: true, prerelease: false, assets: [] };
+    const f = fixture(t, { release, releasePages: [
+        [{ tag_name: '0.1.1', draft: false, prerelease: false, assets: [] }],
+        [{ tag_name: '0.2.0', draft: true, prerelease: false, assets: [] }],
+    ] });
+    publishRelease(f.config, f.gh);
+    assert.deepEqual(f.writes.map(args => args[1]), ['upload', 'edit']);
+    assert.equal(f.release().draft, false);
+});
+
+test('does not create a release when draft listing fails', t => {
+    const f = fixture(t, { listStatus: 403 });
+    assert.throws(() => publishRelease(f.config, f.gh), /Release listing failed/);
+    assert.deepEqual(f.writes, []);
 });
 
 test('rejects a conflicting asset without changing the release', t => {
